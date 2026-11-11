@@ -1,0 +1,14 @@
+/target/
+/test-output/
+/downloads/
+/.tools/
+/.hallmark/
+.DS_Store
+.env
+.env.*
+!.env.example
+*cookies*.txt
+*.pem
+*.key
+/settings.json
+/library.json

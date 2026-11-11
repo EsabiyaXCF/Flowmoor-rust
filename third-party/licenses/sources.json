@@ -1,0 +1,10 @@
+{
+  "apache-2.0.txt": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+  "hls-eventemitter3.txt": "https://raw.githubusercontent.com/primus/eventemitter3/5.0.1/LICENSE",
+  "hls-url-toolkit.txt": "https://raw.githubusercontent.com/tjenkinson/url-toolkit/v2.2.5/LICENSE",
+  "hls-babel.txt": "https://raw.githubusercontent.com/babel/babel/v7.28.0/LICENSE",
+  "hls-svta.txt": "https://raw.githubusercontent.com/streaming-video-technology-alliance/common-media-library/v0.17.1/lib/LICENSE",
+  "yt-dlp.txt": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/2026.10.26/LICENSE",
+  "gpl-3.0.txt": "https://www.gnu.org/licenses/gpl-3.0.txt",
+  "yt-dlp-bundled.txt": "Local .tools/yt-dlp-macos/_internal/THIRD_PARTY_LICENSES.txt; executable reports 2026.10.26.220202; https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/tag/2026.10.26.220202"
+}

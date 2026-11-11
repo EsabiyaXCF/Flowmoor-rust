@@ -1,0 +1,61 @@
+name: Checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Rust tools
+        run: rustup update stable --no-self-update && rustup default stable && rustup component add rustfmt clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo test --locked --no-default-features
+      - run: cargo clippy --locked --no-default-features --all-targets -- -D warnings
+      - run: node tests/scripts/test-preview.cjs
+      - run: python3 scripts/prepare-source.py --check
+  desktop:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Rust tools
+        run: rustup update stable --no-self-update && rustup default stable && rustup component add rustfmt clippy rust-docs
+      - run: cargo fetch --locked
+      - run: python3 scripts/generate-third-party-notices.py
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked --lib --bin flowmoor-rust
+      - run: python3 tests/scripts/test-third-party-notices.py
+  windows:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Rust tools
+        run: rustup update stable --no-self-update && rustup default stable && rustup component add rustfmt clippy rust-docs
+      - run: cargo fmt --all -- --check
+      - run: cargo test --locked --no-default-features
+      - name: Install media tools
+        run: choco install ffmpeg --no-progress -y
+      - name: Verify real recording finalization
+        shell: pwsh
+        run: |
+          $env:FLOWMOOR_TEST_FFMPEG = (Get-Command ffmpeg.exe).Source
+          cargo test --locked --no-default-features --test platform_process
+      - run: cargo clippy --locked --no-default-features --all-targets -- -D warnings
+      - run: cargo fetch --locked
+      - run: python scripts/generate-third-party-notices.py
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked --lib --bin flowmoor-rust
+      - run: python scripts/generate-third-party-notices.py --check
+      - run: node tests/scripts/test-preview.cjs
+      - run: python scripts/prepare-source.py --check

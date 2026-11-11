@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+flowmoor_root=$(CDPATH= cd "$(dirname "$0")/../../../.." && pwd)
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+if [ -z "${FLOWMOOR_YTDLP:-}" ]; then
+  for tool in "$flowmoor_root/.tools/yt-dlp-macos/yt-dlp" "$flowmoor_root/.tools/yt-dlp"; do
+    if [ -x "$tool" ]; then export FLOWMOOR_YTDLP="$tool"; break; fi
+  done
+fi
+exec "$(dirname "$0")/flowmoor-rust"

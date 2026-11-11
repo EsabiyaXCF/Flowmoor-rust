@@ -1,0 +1,43 @@
+[package]
+name = "flowmoor-rust"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+description = "Native YouTube and Twitch downloader built with GPUI and Rust"
+readme = "README.md"
+
+[features]
+default = ["desktop"]
+desktop = ["dep:gpui-kit", "dep:gpui-webview", "dep:wry", "dep:icu_collator", "dep:icu_locale_core"]
+
+[dependencies]
+icu_collator = { version = "=2.4.0", optional = true }
+icu_locale_core = { version = "2", optional = true }
+gpui-kit = { version = "=0.9.0", features = ["gpui-fast"], optional = true }
+gpui-webview = { version = "=0.9.0", features = ["gpui-fast"], optional = true }
+wry = { package = "lb-wry", version = "=0.53.3", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+libc = "0.2"
+ctrlc = "3"
+time = { version = "=0.3.55", features = ["parsing", "formatting", "local-offset"] }
+sha1_smol = "=1.0.1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Console", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
+
+[[test]]
+name = "platform_process"
+path = "tests/platform_process.rs"
+harness = false
+
+[[bin]]
+name = "flowmoor-rust"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[[bin]]
+name = "flowmoor-download"
+path = "src/cli.rs"

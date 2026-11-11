@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>Flowmoor Rust — 第三方授權與資源 / Third-party notices</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,sans-serif;background:#f9fbff;color:#182434;--line:#c3cedc;--link:#24568f}
+body{max-width:78rem;margin:auto;padding:clamp(20px,4vw,56px);line-height:1.65}
+h1{font-size:clamp(1.6rem,4vw,2.2rem);line-height:1.25}h2{margin-top:2.5rem;font-size:1.35rem}h3{font-size:1.1rem}
+p{max-width:74ch}a{color:var(--link);text-underline-offset:.2em;overflow-wrap:anywhere}a:focus-visible,summary:focus-visible{outline:2px solid var(--link);outline-offset:4px}
+nav{display:flex;flex-wrap:wrap;gap:12px 24px;padding:16px 0;border-block:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;text-align:left;font-size:.9rem}th,td{border-bottom:1px solid var(--line);padding:14px 12px;vertical-align:top}td:first-child{min-width:12rem}td div{font-size:.85em;margin-top:4px}
+.table-scroll{overflow-x:auto}details{border-top:1px solid var(--line);padding:14px 0}summary{cursor:pointer;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;font-size:.85rem}code{overflow-wrap:anywhere}
+::selection{background:#c5dcf7;color:#182434}html{scrollbar-color:#879ab0 transparent}
+@media(prefers-color-scheme:dark){:root{background:#020408;color:#f8fcff;--line:#35485f;--link:#b0c6e8}::selection{background:#35485f;color:#f8fcff}}
+</style>
+<body>
+<h1>第三方授權與資源<br><small lang="en">Third-party licenses &amp; resources</small></h1>
+<p>Flowmoor Rust 使用下列開源程式庫、素材、外部工具與網路服務。各元件保有其原作者的權利；此頁不代表 Twitch、YouTube 或其他第三方背書，也不授予平台存取、影片下載、商標或內容再利用的許可。</p>
+<p lang="en">Components retain their respective owners' rights. These notices do not grant permission to access services, download or reuse content, or use trademarks, and do not imply endorsement.</p>
+<nav aria-label="文件導覽 / Document navigation"><a href="#resources">素材與播放器 / Assets</a><a href="#tools">外部工具 / Tools</a><a href="#services">網路服務 / Services</a><a href="#packages">Rust 程式庫 / Libraries</a><a href="#license-texts">授權原文 / License texts</a><a href="#rust">Rust standard library</a></nav>
+
+<h2 id="resources">素材與播放器 / Assets &amp; player</h2>
+<ul>
+<li><a href="https://github.com/video-dev/hls.js/tree/v1.6.15">hls.js light 1.6.15</a>：Apache-2.0，含 Dailymotion、Brightcove 的來源聲明，以及 EventEmitter3 5.0.1（MIT）、url-toolkit 2.2.5（Apache-2.0）、SVTA common-media-library 0.17.1（Apache-2.0）及 Babel helpers（MIT）的授權原文。</li>
+<li><a href="https://github.com/phosphor-icons/core">Phosphor Icons</a>：MIT，Copyright © 2020 Phosphor Icons。</li>
+<li><a href="https://lucide.dev/license">Lucide／Feather 圖示</a>：由 gpui-kit-assets 0.9.0 內嵌；保留 Lucide 的 ISC 授權及 Feather／Cole Bemis 的 MIT 聲明。</li>
+<li>Twitch 標誌：用於辨識來源平台，商標屬 Twitch；使用受 <a href="https://legal.twitch.com/en/legal/trademark/">Twitch 商標規範</a>約束。現有 SVG 未記錄原始下載來源，此頁不宣稱已取得額外商標或素材授權。</li>
+<li>Flowmoor 標誌與紙船沿用本專案既有素材；此頁不對其來源或所有權另作認證。系統字體與 macOS WKWebView 由作業系統提供，未附送字型或 WebKit 執行環境。</li>
+</ul>
+
+<h2 id="tools">外部工具 / External tools</h2>
+<p>Flowmoor 透過獨立程序呼叫工具。工具可由使用者安裝，或透過 <code>FLOWMOOR_YTDLP</code>／<code>FLOWMOOR_FFMPEG</code> 指定。隨附的 <code>run.sh</code> 不會將這些工具複製進 App。下列聲明不能代替實際附送版本的授權與對應原始碼。</p>
+<p lang="en">Tools run as separate processes. The launcher does not bundle them. If redistributing tool binaries, preserve the notices for the actual builds and fulfill their corresponding-source requirements.</p>
+<ul>
+<li><a href="https://github.com/yt-dlp/yt-dlp#licensing">yt-dlp</a>：原始碼為 Unlicense。Unix zipimport 發行檔另含 Meriyah（ISC）、Astring（MIT）；macOS PyInstaller 發行檔包含 GPLv3+ 元件，組合發行檔為 GPLv3+。盤點時的 macOS 工具為 <a href="https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/tag/2026.10.26.220202">2026.10.26.220202</a>，Unix 備用工具為 2026.10.26。本頁收錄 macOS 工具隨附的完整第三方聲明快照及 yt-dlp 的 Unlicense；不表示工具必定隨 App 附送。版本或建置不同時，應核對該發行檔的聲明與原始碼。</li>
+<li><a href="https://ffmpeg.org/legal.html">FFmpeg／ffprobe</a>：授權取決於建置選項，可為 LGPL 或 GPL。盤點時的 Homebrew 8.1.2 建置啟用了 <code>--enable-gpl --enable-version3</code>，其 <code>ffmpeg -L</code> 報告為 GPLv3+。若附送這個版本，須提供 GPL 授權、適當的對應原始碼取得方式及其內附元件聲明；若改用其他建置，應重新核對。</li>
+<li><a href="https://curl.se/docs/copyright.html">curl</a>：用於 HTTPS 請求，採 curl 授權；目前呼叫系統執行檔，未附送 curl。重新散布自帶的 curl 時，也要核對其 TLS 與其他內附元件。</li>
+</ul>
+
+<h2 id="services">網路服務與內容 / Network services &amp; content</h2>
+<ul>
+<li><a href="https://www.youtube.com/static?template=terms">YouTube</a>：影片、頻道資料與下載透過 yt-dlp 取得；預覽可能載入 YouTube 嵌入播放器。影片、縮圖及頻道素材的權利屬各權利人，下載與再利用仍須符合適用條款、法律與授權。</li>
+<li><a href="https://legal.twitch.com/en/legal/terms-of-service/">Twitch</a>：使用 <code>gql.twitch.tv</code>、Usher HLS、jtvnw 縮圖服務及 CloudFront DVR／串流資源；部分預覽使用 Twitch 嵌入播放器。GraphQL 是 Twitch 內部介面，並非受支援的公開 API；<a href="https://legal.twitch.com/en/legal/developer-agreement/">開發者協議 XI.I</a> 限制未經事先書面許可存取未文件化介面。列出來源不構成 Twitch 授權。</li>
+<li>查詢、縮圖、預覽及下載會直接連線到平台或 CDN，對方可接收 IP、請求資訊及其播放器設定的 Cookie。提供的 Cookie 檔可供 yt-dlp 使用；Twitch 直播查詢會從檔案讀取 <code>auth-token</code>，作為向 Twitch 傳送的 OAuth 授權。使用者應只提供自己有權使用的憑證。</li>
+<li>本頁本身沒有遠端字型、分析碼或外部腳本；閱讀本地授權文字不需要網路。開啟上游連結才會離開本文件。</li>
+</ul>
+<p lang="en">Queries, previews and downloads connect to the platforms/CDNs, which receive network/request information and may use player cookies. A supplied cookie file may authenticate requests. Twitch's internal GraphQL interface is undocumented for third-party use; disclosure does not provide authorization.</p>
+
+<h2 id="packages">Rust 程式庫 / Rust libraries</h2>
+<p>目標：<code><!-- TARGET --></code>；<!-- PACKAGE_COUNT --> 個外部套件，包含間接依賴與建置工具。這是 Cargo 解析圖的保守彙整，不代表每個套件都連結進最終執行檔。其他作業系統的發行版須以對應 target 重新產生。</p>
+<p>建置工具鏈：<!-- RUST_VERSION --><br>Cargo.lock SHA-256：<code><!-- LOCK_HASH --></code></p>
+<p><code>OR</code> 表示上游允許選擇授權，<code>AND</code> 表示須同時遵守。此頁保留上游提供的授權原文，並不把 Flowmoor 本身改授權為所有列出的授權。</p>
+<p>MPL-2.0 元件（例如 option-ext）的對應原始碼可由各列「此版本原始碼」連結取得；本專案未修改這些元件。若日後修改，發行者須提供相應修改後的 MPL 原始碼。建置用的 cbindgen 也列入盤點，不代表它被附送給使用者。</p>
+<p>未取得獨立上游授權原文的套件：<!-- MISSING_TEXTS -->。其授權宣告與來源仍列於下表；這些項目需要在正式散布前確認，不應把這份揭露視為完整合規認證。</p>
+<div class="table-scroll" role="region" aria-label="Rust dependencies" tabindex="0"><table><thead><tr><th scope="col">元件 / Component</th><th scope="col">授權 / License</th><th scope="col">依賴 / Dependency</th><th scope="col">來源與聲明 / Source &amp; notices</th></tr></thead><tbody>
+<!-- PACKAGES -->
+</tbody></table></div>
+
+<h2 id="license-texts">授權原文 / Original license texts</h2>
+<p>相同文字以內容雜湊合併；套件列與素材清單連結到對應原文。原文未翻譯或改寫。</p>
+<ul><!-- RESOURCE_LICENSES --></ul>
+<!-- LICENSE_TEXTS -->
+
+<details id="rust"><summary>Rust 標準函式庫與執行時期聲明 / Standard library &amp; runtime notices</summary>
+<!-- RUST_NOTICES -->
+</details>
+</body>
+</html>

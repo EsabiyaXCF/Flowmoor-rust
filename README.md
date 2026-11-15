@@ -2,7 +2,7 @@
 
 使用 GPUI＋Rust 的原生 YouTube／Twitch 下載工具，可下載影片、VOD 與直播，選擇畫質、編碼與時間範圍，並在媒體庫預覽和重新下載。
 
-目前為來源建置預覽版，已在 Apple Silicon macOS 驗收。尚未提供可攜式、簽署或公證的安裝包；Windows／Linux 桌面版尚未完成實機驗收。
+目前為來源建置預覽版，已在 Apple Silicon macOS 驗收。尚未提供可攜式、簽署或公證的安裝包；Windows 已完成原生建置與下載／本機播放自動測試，完整手動介面驗收及 Linux 實機驗收仍未完成。
 
 ## 啟動
 
@@ -23,6 +23,23 @@ brew install yt-dlp ffmpeg
 這會產生並啟動 `target/Flowmoor Rust.app`。目前 App 仍使用專案內資產，請保留原始碼目錄。開發模式可使用 `./run.sh`。
 
 初次下載：貼上 YouTube／Twitch 網址 → 取得資訊 → 選擇畫質、編碼與時間範圍 → 選輸出資料夾 → 開始下載。頻道網址可瀏覽影片清單；Twitch VOD 滾到底部會繼續載入。
+
+
+## Windows 建置
+
+準備 Rust stable、Visual Studio C++ Build Tools／Windows SDK、WebView2 Runtime，以及 PATH 中的 yt-dlp、FFmpeg／ffprobe 與 curl。2026-11-11 實測使用 Rust 1.99.1；較舊的 Rust 1.88 無法編譯目前鎖定的桌面依賴。
+
+在專案根目錄的 PowerShell 執行：
+
+```powershell
+rustup update stable --no-self-update
+cargo build --locked --bins
+.\target\debug\flowmoor-rust.exe
+```
+
+程式仍會使用專案的 assets，請保留原始碼目錄。可設定 FLOWMOOR_YTDLP／FLOWMOOR_FFMPEG 指向工具的完整路徑。
+
+Windows 已驗證原生編譯、真實下載、程序停止及自動原生播放器流程；遠端嵌入播放與完整視覺／手動互動驗收仍未完成。詳細結果見 [驗收紀錄](docs/VALIDATION.md)。
 
 ## 下載與媒體庫
 

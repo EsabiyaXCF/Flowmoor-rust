@@ -146,3 +146,42 @@ p1lepe1el1、hungry 在本輪連線時離線，正確回報而未宣稱成功。
 - x86_64-pc-windows-gnu 的 no-default-features all-targets 編譯檢查與嚴格 Clippy 通過；這是在 macOS 上交叉檢查，沒有執行 Windows 程式。
 - 指定完整下載腳本完成公開 YouTube jNQXAC9IVRw，0–3 秒／144p／H.264+AAC；FFprobe 為 3.024000 秒，媒體位於忽略的 test-output/flowmoor-1794391194621。
 - 已加入 Windows CI，含原生程序整合測試、FFmpeg 收尾及桌面建置檢查；尚未推送或執行遠端 CI，Windows GUI／播放器也尚未實機驗收。
+
+## 2026-11-11 Windows x64 原生驗收
+
+環境：Windows x64 MSVC、Rust 1.99.1、Node.js 24.22.1、yt-dlp 2026.03.21.233500、FFmpeg／ffprobe 6.0。原 Rust 1.88 因桌面依賴要求較新版本而失敗，更新 stable 後編譯通過。測試程式、設定及媒體均位於忽略的 test-output，沒有修改原 Electron 專案。
+
+### 發現與修正
+
+- Windows Ctrl+C relay 的 AttachConsole 回傳 ERROR_ACCESS_DENIED，造成停止保存失敗。relay 先 FreeConsole 再連接下載程序；保留具體 Win32 錯誤。原生程序整合及真正 FFmpeg 收尾重測通過。
+- 點擊預覽曾觸發 GPUI App RefCell 重入 panic。Windows 改用 lb-wry 的 build_as_child_async，在 GPUI 借用之外建立 WebView2；關閉預覽會取消仍在初始化的工作。下載頁與媒體庫共用修正。
+- debug 版另重現主執行緒 stack overflow；Windows MSVC 桌面 linker 設定 8 MiB stack reserve。其餘平台與 CLI 不套用此設定。
+
+### 檢查與真實媒體
+
+- cargo test --locked --no-default-features：17 library 測試及 platform_process 整合通過，含實際 FFmpeg 錄音收尾。worker.rs 以 cfg(unix) 限制，在 Windows 執行 0 項，沒有將其計入通過數。
+- 桌面 library 18 項（增加語言排序）及 desktop 3 項測試通過；cargo check --locked --all-targets、嚴格 all-target Clippy、格式檢查及 Windows bins build 通過。
+- preview.js 行為測試通過。
+- CLI 實際拒絕不支援來源、反向／不完整時間範圍及 CON 保留檔名，未產生下載進度。
+- 以下下載均使用 tests/scripts/test-flowmoor-complete-download.cjs，FFprobe 檢查串流、編碼、畫質、長度及適用的影音起點差距：
+
+| 來源 | 設定 | 實際長度 |
+|---|---|---|
+| YouTube jNQXAC9IVRw | 0–3 秒、144p、H.264／AAC | 3.046 秒 |
+| 同影片 | 1–4 秒、純 MP3 | 3.024 秒 |
+| 同影片 | 1–3 秒、144p、純 VP9 | 1.999 秒 |
+| 同影片 | 0–3 秒、144p、AV1／Opus、中文與空白檔名 | 3.033 秒 |
+| 同影片 | 完整影片、144p、H.264／AAC | 19.034 秒 |
+| Twitch VOD 2924625705 | 10–13 秒、360p、H.264／AAC | 3.021 秒 |
+| YouTube @LofiGirl/live | 0–3 秒、144p、H.264／AAC | 3.027 秒 |
+| Twitch p1lepe1el1 直播 DVR | 1–4 秒、360p、H.264／AAC | 3.050 秒 |
+
+另以同一 Manager 實際擷取 p1lepe1el1，收到資料後呼叫 stop：Stopped、33,446,755 bytes，speed／ETA 已清空。FFprobe 確認可讀的 420.266 秒、360p、H.264／AAC；這次來源使用 DVR 從頭擷取，因此輸出長度不等於測試經過的牆鐘時間。媒體及結果位於 test-output/live-stop。
+
+### 原生自動流程及限制
+
+opt-in native_download_and_preview 測試通過：真正查詢 YouTube 資訊、透過 DownloadApp 加入三秒下載、設定／媒體庫寫入並讀回、媒體庫 remux／WebView2 播放、回報播放時間前進、定位及切換設定頁後移除播放器。原生下載檔另經 FFprobe 確認為 3.046 秒 H.264／AAC。
+
+隱藏視窗的版本曾在播放檢查逾時；可見且不搶焦點的原生測試視窗通過。測試不注入鍵鼠輸入，也不等同人工視覺驗收。依使用者要求已停止 computer-use 操作。
+
+遠端 YouTube 預覽在本次短暫觀察中 loaded=false，原因及遠端嵌入播放仍未驗收；不能將本機播放通過延伸為所有遠端預覽正常。視覺裁切、選單覆蓋、資料夾選擇器、完整手動互動、長時間直播斷線恢復、私人／會員來源、Linux 與 Windows release 封裝仍未驗收。參考 GPUI Kit 官方 WebView 文件，Windows 的原生子視窗與合成／覆蓋能力另有限制：[WebView guide](https://gpui-kit.com/docs/webview/)。

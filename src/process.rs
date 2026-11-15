@@ -53,11 +53,18 @@ pub fn handle_signal() {
             .nth(2)
             .and_then(|value| value.parse::<u32>().ok());
         let success = pid.is_some_and(|pid| unsafe {
+            // CREATE_NO_WINDOW can still attach a console application to a hidden console.
+            // Detach only this short-lived relay before joining the download's console.
+            FreeConsole();
             if AttachConsole(pid) == 0 {
+                eprintln!("AttachConsole({pid}): {}", io::Error::last_os_error());
                 return false;
             }
             let sent = SetConsoleCtrlHandler(None, 1) != 0
                 && GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0) != 0;
+            if !sent {
+                eprintln!("GenerateConsoleCtrlEvent: {}", io::Error::last_os_error());
+            }
             // Console control handlers run asynchronously.
             std::thread::sleep(std::time::Duration::from_millis(100));
             FreeConsole();
@@ -295,9 +302,10 @@ mod windows {
         if output.status.success() || child.try_wait()?.is_some() {
             Ok(())
         } else {
-            Err(io::Error::other(
-                "Could not send Ctrl+C to the download process",
-            ))
+            Err(io::Error::other(format!(
+                "Could not send Ctrl+C to the download process: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            )))
         }
     }
 }

@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Default, Deserialize)]
+#[derive(Default, Deserialize, Debug)]
 pub(super) struct Playback {
     pub(super) time: f64,
     pub(super) duration: f64,
@@ -28,7 +28,8 @@ pub(super) struct Playback {
     error: Option<String>,
 }
 pub struct Preview {
-    web: Entity<WebView>,
+    web: Option<Entity<WebView>>,
+    initialize: Option<Task<()>>,
     _playlist: Option<crate::playlist_server::PlaylistServer>,
     pub(super) state: Playback,
     pub(super) selection: (u64, u64),
@@ -213,8 +214,19 @@ impl Preview {
                     let _ = tx.try_send(state);
                 }
             });
-        let view = WebView::build(builder, window, cx).map_err(|e| format!("無法建立預覽：{e}"))?;
-        let web = cx.new(|_| view);
+        #[cfg(not(target_os = "windows"))]
+        let web = {
+            let view =
+                WebView::build(builder, window, cx).map_err(|e| format!("無法建立預覽：{e}"))?;
+            Some(cx.new(|_| view))
+        };
+        #[cfg(target_os = "windows")]
+        let parent = {
+            use wry::raw_window_handle::HasWindowHandle;
+            window.window_handle().map_err(|e| e.to_string())?.as_raw()
+        };
+        #[cfg(target_os = "windows")]
+        let web = None;
         let volume = cx.new(|_| {
             SliderState::new()
                 .min(0.)
@@ -223,6 +235,33 @@ impl Preview {
                 .default_value(1.)
         });
         Ok(cx.new(|cx: &mut Context<Self>| {
+            #[cfg(target_os = "windows")]
+            let initialize = Some(cx.spawn_in(window, async move |this, cx| {
+                if this.update_in(cx, |_, _, _| ()).is_err() {
+                    return;
+                }
+                // The synchronous WebView2 builder pumps messages inside a GPUI borrow.
+                // Await its native async builder instead, outside any App/Window borrow.
+                // The handle belongs to the live window checked above; use it only on
+                // this UI thread, never store the borrowed handle in another entity.
+                let parent = unsafe { wry::raw_window_handle::WindowHandle::borrow_raw(parent) };
+                let view = builder
+                    .with_visible(false)
+                    .build_as_child_async(&parent)
+                    .await;
+                let _ = this.update_in(cx, |this, window, cx| {
+                    match view {
+                        Ok(view) => {
+                            let web = WebView::new(view, window, cx);
+                            this.web = Some(cx.new(|_| web));
+                        }
+                        Err(error) => this.error = Some(format!("無法建立預覽：{error}")),
+                    }
+                    cx.notify();
+                });
+            }));
+            #[cfg(not(target_os = "windows"))]
+            let initialize = None;
             let subscriptions = vec![cx.subscribe(&volume, |this, _, event: &SliderEvent, cx| {
                 if let SliderEvent::Change(value) = event {
                     this.set_volume(value.end(), cx);
@@ -276,6 +315,7 @@ impl Preview {
             .detach();
             Self {
                 web,
+                initialize,
                 _playlist: playlist,
                 state: Playback {
                     duration,
@@ -300,6 +340,9 @@ impl Preview {
             }
         }))
     }
+    pub(super) fn toggle(&mut self, cx: &mut Context<Self>) {
+        self.command("window.flowmoorPreview.toggle()", cx);
+    }
     fn command(&mut self, script: &str, cx: &mut Context<Self>) {
         let script = [
             "(()=>{const v=document.querySelector('video');",
@@ -307,7 +350,9 @@ impl Preview {
             "})()",
         ]
         .concat();
-        if let Err(e) = self.web.read(cx).raw().evaluate_script(&script) {
+        if let Some(web) = &self.web
+            && let Err(e) = web.read(cx).raw().evaluate_script(&script)
+        {
             self.error = Some(e.to_string());
         }
         cx.notify();
@@ -315,13 +360,16 @@ impl Preview {
     pub fn focus(&self, window: &mut Window, cx: &mut App) {
         self.timeline_focus.focus(window, cx);
     }
-    pub fn hide(&self, cx: &mut App) {
-        self.web.update(cx, |v, _| {
-            let _ = v
-                .raw()
-                .evaluate_script("document.querySelector('video')?.pause()");
-            v.hide();
-        });
+    pub fn hide(&mut self, cx: &mut App) {
+        self.initialize = None;
+        if let Some(web) = &self.web {
+            web.update(cx, |v, _| {
+                let _ = v
+                    .raw()
+                    .evaluate_script("document.querySelector('video')?.pause()");
+                v.hide();
+            });
+        }
     }
     pub fn set_range(
         &mut self,
@@ -392,7 +440,7 @@ impl Render for Preview {
                     .rounded(px(12.))
                     .overflow_hidden()
                     .flex_shrink_0()
-                    .child(self.web.clone()),
+                    .children(self.web.clone()),
             )
             .when_some(timeline, |d, t| d.child(t))
             .child(if self.local {
@@ -491,11 +539,7 @@ impl Render for Preview {
                                 )
                                 .accessibility_label(tr("播放／暫停"))
                                 .tooltip(tr("播放／暫停"))
-                                .on_click(cx.listener(
-                                    |this, _, _, cx| {
-                                        this.command("window.flowmoorPreview.toggle()", cx)
-                                    },
-                                )),
+                                .on_click(cx.listener(|this, _, _, cx| this.toggle(cx))),
                             )
                             .child(
                                 self.control_button(
@@ -701,7 +745,7 @@ impl Preview {
                 .tooltip(tr(label))
                 .on_click(cx.listener(move |this, _, _, cx| match index {
                     0 => this.seek_to(0., cx),
-                    1 => this.command("window.flowmoorPreview.toggle()", cx),
+                    1 => this.toggle(cx),
                     _ => this.seek_to(this.state.duration, cx),
                 })),
             );

@@ -10,6 +10,9 @@ mod playlist_server;
 mod preview;
 mod preview_timeline;
 mod twitch_channel_view;
+#[cfg(all(test, target_os = "windows"))]
+#[path = "../tests/native/windows_desktop.rs"]
+mod windows_desktop;
 use flowmoor_rust::channel::{self, ChannelSource};
 mod chrome_view;
 mod dropdown_controls;

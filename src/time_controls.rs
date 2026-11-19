@@ -19,7 +19,10 @@ pub fn compact_clock(seconds: u64) -> String {
         format!("{}:{:02}", seconds / 60, seconds % 60)
     }
 }
-pub fn precision(duration: Option<u64>, up: f32) -> u64 {
+pub fn precision_steps(duration: Option<u64>) -> &'static [u64] {
+    const STEPS: &[u64] = &[
+        300, 240, 180, 120, 90, 60, 45, 30, 20, 15, 10, 8, 6, 5, 4, 3, 2, 1,
+    ];
     let base = match duration {
         None => 300,
         Some(n) if n >= 18000 => 120,
@@ -29,12 +32,10 @@ pub fn precision(duration: Option<u64>, up: f32) -> u64 {
         Some(n) if n >= 600 => 10,
         _ => 5,
     };
-    let steps: Vec<_> = [
-        300, 240, 180, 120, 90, 60, 45, 30, 20, 15, 10, 8, 6, 5, 4, 3, 2, 1,
-    ]
-    .into_iter()
-    .filter(|s| *s <= base)
-    .collect();
+    &STEPS[STEPS.iter().position(|step| *step == base).unwrap()..]
+}
+pub fn precision(duration: Option<u64>, up: f32) -> u64 {
+    let steps = precision_steps(duration);
     steps[((up / 96.).clamp(0., 1.) * (steps.len() - 1) as f32).round() as usize]
 }
 pub fn scrub(original: u64, dx: f32, up: f32, duration: Option<u64>) -> u64 {
@@ -80,6 +81,9 @@ mod tests {
     use super::*;
     #[test]
     fn original_precision_and_crossing_rules() {
+        assert_eq!(precision_steps(Some(19)), &[5, 4, 3, 2, 1]);
+        assert_eq!(precision_steps(None).len(), 18);
+        assert_eq!(precision(Some(19), 48.), 3);
         assert_eq!(precision(Some(20000), 0.), 120);
         assert_eq!(precision(Some(19), 96.), 1);
         assert_eq!(scrub(10, 90., 96., Some(19)), 14);

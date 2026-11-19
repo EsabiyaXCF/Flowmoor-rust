@@ -393,6 +393,7 @@ fn clock(seconds: f64) -> String {
 }
 impl Render for Preview {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let compact = self.timeline_bounds.get().size.width < px(640.);
         let timeline = if !self.live {
             Some(self.timeline(window, cx))
         } else {
@@ -428,16 +429,20 @@ impl Render for Preview {
             .child(
                 div()
                     .w_full()
-                    .aspect_ratio(if self.expanded { 1.8 } else { 16. / 9. })
+                    .aspect_ratio(16. / 9.)
                     .when(self.expanded, |d| {
-                        d.h((window.viewport_size().height - px(180.)).max(px(180.)))
+                        d.h(
+                            (window.viewport_size().height - px(if compact { 288. } else { 180. }))
+                                .max(px(80.)),
+                        )
                     })
                     .max_h(if self.expanded {
                         window.viewport_size().height - px(150.)
                     } else {
                         px(560.)
                     })
-                    .rounded(px(12.))
+                    .rounded(px(14.))
+                    .bg(rgb(0x020617))
                     .overflow_hidden()
                     .flex_shrink_0()
                     .children(self.web.clone()),
@@ -448,9 +453,10 @@ impl Render for Preview {
             } else {
                 div()
                     .flex()
+                    .when(compact, |d| d.flex_col())
                     .items_center()
                     .justify_between()
-                    .gap(px(6.))
+                    .gap(px(if compact { 8. } else { 6. }))
                     .px_2()
                     .py_1p5()
                     .rounded(px(16.))
@@ -464,6 +470,7 @@ impl Render for Preview {
                         div()
                             .flex_1()
                             .min_w_0()
+                            .when(compact, |d| d.flex_none().w_full().justify_center())
                             .flex()
                             .items_center()
                             .gap_1p5()
@@ -477,8 +484,7 @@ impl Render for Preview {
                                         IconName::Maximize2
                                     },
                                     None,
-                                    !self.state.ready
-                                        || self.volume_hover
+                                    self.volume_hover
                                         || self.volume_focus.contains_focused(window, cx),
                                     cx,
                                 )
@@ -573,9 +579,12 @@ impl Render for Preview {
                     .child(
                         div()
                             .flex_1()
+                            .min_w_0()
+                            .when(compact, |d| d.flex_none().w_full())
                             .flex()
                             .items_center()
                             .justify_end()
+                            .when(compact, |d| d.justify_center())
                             .gap_1()
                             .child(div().text_xs().child(if self.live {
                                 "直播中".into()
@@ -718,6 +727,7 @@ impl Preview {
             )
     }
     fn local_controls(&self, window: &mut Window, cx: &mut Context<Self>) -> Div {
+        let compact = self.timeline_bounds.get().size.width < px(640.);
         let expanded = self.volume_hover || self.volume_focus.contains_focused(window, cx);
         let mut playback = div().flex().items_center().gap_1p5();
         for (index, icon, label) in [
@@ -753,6 +763,7 @@ impl Preview {
         div()
             .w_full()
             .flex()
+            .when(compact, |d| d.flex_col())
             .items_center()
             .gap_1p5()
             .px_2()
@@ -768,6 +779,7 @@ impl Preview {
                 div()
                     .flex_1()
                     .min_w_0()
+                    .when(compact, |d| d.flex_none().w_full().justify_center())
                     .flex()
                     .items_center()
                     .gap_1p5()
@@ -781,7 +793,7 @@ impl Preview {
                                 IconName::Maximize2
                             },
                             None,
-                            !self.state.ready || expanded,
+                            expanded,
                             cx,
                         )
                         .when(expanded, |b| b.opacity(0.))
@@ -797,6 +809,7 @@ impl Preview {
                     .min_w_0()
                     .flex()
                     .justify_end()
+                    .when(compact, |d| d.flex_none().w_full().justify_center())
                     .text_size(px(11.))
                     .font_family("Menlo")
                     .text_color(cx.theme().muted_foreground)

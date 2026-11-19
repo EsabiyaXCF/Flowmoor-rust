@@ -12,6 +12,7 @@ pub(super) struct DownloadSnapshot {
     end: String,
     filename: String,
     contents: Vec<Content>,
+    container: VideoContainer,
     quality: Option<SharedString>,
     video_codec: Option<SharedString>,
     audio_codec: Option<SharedString>,
@@ -52,6 +53,7 @@ impl DownloadApp {
             end: self.end.read(cx).value().to_string(),
             filename: self.filename.read(cx).value().to_string(),
             contents: self.contents.clone(),
+            container: self.container,
             quality: self.quality.read(cx).selected_value().cloned(),
             video_codec: self.video_codec.read(cx).selected_value().cloned(),
             audio_codec: self.audio_codec.read(cx).selected_value().cloned(),
@@ -108,6 +110,7 @@ impl DownloadApp {
             self.fetch_channel_images();
         }
         self.contents = s.contents;
+        self.container = s.container;
         self.live_from_start = s.live_from_start;
         let mut heights: Vec<_> = self
             .info

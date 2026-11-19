@@ -1,5 +1,5 @@
 use super::*;
-use flowmoor_rust::time_controls::{clock, precision, range, scrub};
+use flowmoor_rust::time_controls::{clock, precision, precision_steps, range, scrub};
 pub(super) struct TimeDrag {
     pub start: bool,
     pub origin: Point<Pixels>,
@@ -100,7 +100,13 @@ impl DownloadApp {
         .size_full()
         .into_any_element()
     }
-    pub(super) fn time_field(&self, start: bool, cx: &mut Context<Self>) -> Div {
+    pub(super) fn time_field(
+        &self,
+        start: bool,
+        inline: bool,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
         let label = if start {
             "開始時間"
         } else {
@@ -110,20 +116,41 @@ impl DownloadApp {
         let value = input.read(cx).value();
         let seconds = parse_time(&value).unwrap_or(0);
         let mut shell = div()
+            .id(if start {
+                "start-time-field"
+            } else {
+                "end-time-field"
+            })
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                if *hovered != (this.time_hover == Some(start)) {
+                    this.time_hover = hovered.then_some(start);
+                    cx.notify();
+                }
+            }))
             .flex_1()
             .relative()
             .min_w_0()
             .flex()
             .flex_col()
-            .gap(px(8.))
+            .gap_1()
+            .when(inline, |d| d.flex_row().items_center().gap_2())
             .child(
                 div()
+                    .flex_shrink_0()
                     .text_xs()
                     .text_color(cx.theme().muted_foreground)
                     .child(label),
             );
         if self.edit_time == Some(start) {
-            shell = shell.child(Input::new(input).aria_label(label).h_11());
+            shell = shell.child(
+                Input::new(input)
+                    .font_family("Menlo")
+                    .text_align(TextAlign::Center)
+                    .bg(cx.theme().button)
+                    .aria_label(label)
+                    .h(self.form_control_height(window))
+                    .when(inline, |d| d.flex_1().min_w_0()),
+            );
         } else {
             shell = shell.child(
                 div()
@@ -141,15 +168,25 @@ impl DownloadApp {
                     .font_family("Menlo")
                     .track_focus(&self.time_focus[usize::from(!start)])
                     .tab_index(0)
-                    .h_11()
-                    .w_full()
+                    .h(self.form_control_height(window))
+                    .when(inline, |d| d.flex_1().min_w_0())
                     .flex()
                     .items_center()
                     .justify_center()
                     .rounded(px(10.))
                     .cursor(CursorStyle::ResizeLeftRight)
-                    .hover(|s| s.bg(cx.theme().muted))
-                    .child(clock(seconds))
+                    .focus_visible(|s| s.border_1().border_color(cx.theme().ring))
+                    .hover(|s| s.bg(cx.theme().button_hover))
+                    .text_color(if value.is_empty() {
+                        cx.theme().muted_foreground
+                    } else {
+                        cx.theme().foreground
+                    })
+                    .child(if value.is_empty() {
+                        "00:00:00".into()
+                    } else {
+                        value.to_string()
+                    })
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, e: &MouseDownEvent, window, cx| {
@@ -168,18 +205,64 @@ impl DownloadApp {
                     ),
             );
         }
-        if let Some(drag) = &self.time_drag
-            && drag.start == start
-        {
-            shell = shell.child(
-                div()
-                    .absolute()
-                    .right_0()
-                    .top_0()
-                    .text_xs()
-                    .text_color(cx.theme().primary)
-                    .child(format!("{} 秒", drag.step)),
-            );
+        let active = self.time_drag.as_ref().filter(|drag| drag.start == start);
+        if active.is_some() || (self.time_drag.is_none() && self.time_hover == Some(start)) {
+            let steps = precision_steps(self.duration_limit());
+            let step = active.map_or(steps[0], |drag| drag.step);
+            let level = steps.iter().position(|value| *value == step).unwrap();
+            let count = steps.len().min(7);
+            let filled = ((level as f32 / (steps.len() - 1) as f32) * (count - 1) as f32).round()
+                as usize
+                + 1;
+            let mut indicator = div()
+                .absolute()
+                .bottom(self.form_control_height(window) + px(6.))
+                .left(relative(0.5))
+                .ml(-px(18.))
+                .w(px(36.))
+                .p(px(6.))
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap(px(4.))
+                .rounded(px(10.))
+                .border_1()
+                .border_color(cx.theme().border)
+                .bg(if self.dark {
+                    cx.theme().accent
+                } else {
+                    cx.theme().sidebar
+                })
+                .text_color(cx.theme().foreground)
+                .shadow(vec![BoxShadow {
+                    color: cx.theme().overlay.opacity(0.16),
+                    offset: point(px(0.), px(8.)),
+                    blur_radius: px(20.),
+                    spread_radius: px(-4.),
+                    inset: false,
+                }])
+                .child(Icon::new(IconName::ArrowUp).size_3())
+                .child(
+                    div()
+                        .text_size(px(10.))
+                        .font_weight(FontWeight::MEDIUM)
+                        .child(format!("{step}s")),
+                );
+            for index in 0..count {
+                indicator = indicator.child(
+                    div()
+                        .w(px(if index == count - 1 { 14. } else { 12. }))
+                        .h(px(3.))
+                        .rounded_full()
+                        .bg(if index >= count - filled {
+                            cx.theme().primary
+                        } else {
+                            cx.theme().border.opacity(0.6)
+                        }),
+                );
+            }
+            indicator = indicator.child(Icon::new(IconName::ArrowDown).size_3());
+            shell = shell.child(deferred(indicator));
         }
         shell.capture_key_down(cx.listener(move |this, e: &KeyDownEvent, w, cx| {
             let input = if start { &this.start } else { &this.end };

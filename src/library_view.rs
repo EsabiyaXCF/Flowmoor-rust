@@ -154,6 +154,7 @@ impl DownloadApp {
             v.set_value(request.format.filename.clone(), w, cx)
         });
         self.contents = vec![request.format.content];
+        self.container = request.format.container;
         self.output.update(cx, |v, cx| {
             v.set_value(request.output.to_string_lossy().into_owned(), w, cx)
         });
@@ -204,7 +205,11 @@ impl DownloadApp {
                         job.set_title(entry.result.title.clone());
                         self.job_metadata.insert(
                             job.snapshot().id,
-                            (entry.thumbnail.clone(), entry.uploader.clone()),
+                            DownloadMetadata {
+                                thumbnail: entry.thumbnail.clone(),
+                                uploader: entry.uploader.clone(),
+                                avatar: None,
+                            },
                         );
                     })
                     .err();
@@ -257,7 +262,7 @@ impl DownloadApp {
         }
         cx.notify();
     }
-    pub(super) fn library_view(&self, _window: &mut Window, cx: &mut Context<Self>) -> Div {
+    pub(super) fn library_view(&self, window: &mut Window, cx: &mut Context<Self>) -> Div {
         let mut view = div()
             .w_full()
             .max_w(px(1152.))
@@ -343,6 +348,7 @@ impl DownloadApp {
                             .min_w_0()
                             .child(
                                 Input::new(&self.library_search)
+                                    .bg(cx.theme().button)
                                     .h_12()
                                     .prefix(Icon::new(IconName::Search).size_5())
                                     .aria_label(tr("搜尋標題或頻道")),
@@ -361,6 +367,7 @@ impl DownloadApp {
                                 } else {
                                     "依日期排序"
                                 }),
+                                window,
                                 cx,
                             )),
                     ),
@@ -565,12 +572,17 @@ impl DownloadApp {
                                     .child(
                                         div()
                                             .flex()
-                                            .gap_3()
+                                            .flex_wrap()
+                                            .min_w_0()
+                                            .gap_x_3()
+                                            .gap_y_1()
                                             .text_xs()
                                             .text_color(cx.theme().muted_foreground)
                                             .child(tr("下載"))
                                             .child(tr(entry.result.phase.label()))
-                                            .child(date),
+                                            .child(
+                                                div().min_w_0().max_w_full().truncate().child(date),
+                                            ),
                                     ),
                             ),
                     )

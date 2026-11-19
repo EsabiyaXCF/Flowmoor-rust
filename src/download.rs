@@ -14,6 +14,9 @@ use std::{
 };
 use url::Url;
 
+pub(crate) const OPUS_CHANNEL_FILTER: &str =
+    "aformat=channel_layouts=mono|stereo|3.0|quad|5.0|5.1|6.1|7.1";
+
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub enum Content {
     #[default]
@@ -36,6 +39,29 @@ pub enum AudioCodec {
     Mp3,
     Aac,
     Opus,
+}
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum VideoContainer {
+    #[default]
+    Auto,
+    Mp4,
+    Mkv,
+}
+impl VideoContainer {
+    fn extension(self) -> Option<&'static str> {
+        match self {
+            Self::Auto => None,
+            Self::Mp4 => Some("mp4"),
+            Self::Mkv => Some("mkv"),
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Auto => "自動",
+            Self::Mp4 => "MP4",
+            Self::Mkv => "MKV",
+        }
+    }
 }
 impl VideoCodec {
     pub(crate) fn ffmpeg(self) -> (&'static str, &'static str) {
@@ -65,6 +91,14 @@ pub struct FormatOptions {
     pub filename: String,
     pub video_codec: VideoCodec,
     pub audio_codec: AudioCodec,
+    pub container: VideoContainer,
+}
+impl FormatOptions {
+    fn needs_stream_processing(&self) -> bool {
+        self.content != Content::VideoAudio
+            || self.video_codec != VideoCodec::Auto
+            || self.audio_codec != AudioCodec::Auto
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -445,6 +479,12 @@ pub fn arguments(
     directory: &std::path::Path,
     tools: &Tools,
 ) -> Vec<std::ffi::OsString> {
+    // Only merge into the final container here when no stream selection or encoding follows.
+    let container = if request.format.needs_stream_processing() {
+        None
+    } else {
+        request.format.container.extension()
+    };
     let mut args: Vec<std::ffi::OsString> = [
         "--ignore-config",
         "--no-playlist",
@@ -471,13 +511,17 @@ pub fn arguments(
         "--print",
         "after_move:FLOWMOOR_FILE %(filepath)j",
         "--merge-output-format",
-        "mkv",
+        container.unwrap_or("mkv"),
         "--paths",
     ]
     .iter()
     .map(Into::into)
     .collect();
     args.push(directory.into());
+    if let Some(ext) = container {
+        // A single, already-muxed source skips yt-dlp's merge step.
+        args.extend(["--remux-video".into(), ext.into()]);
+    }
     let cap = request
         .format
         .max_height
@@ -495,7 +539,7 @@ pub fn arguments(
         VideoCodec::Av1 => Some("av1"),
     };
     if let Some(codec) = preferred {
-        args.extend(["--format-sort".into(), format!("vcodec:{codec}").into()]);
+        args.extend(["--format-sort".into(), format!("res,vcodec:{codec}").into()]);
     }
     args.extend([
         "--format".into(),
@@ -846,10 +890,9 @@ fn run_job(job: &Arc<Job>, tools: &Tools) {
         {
             drop(s);
             let f = &job.request.format;
-            // Video-only also strips muxed audio when Twitch has no separate video stream.
-            if f.video_codec != VideoCodec::Auto
-                || f.audio_codec != AudioCodec::Auto
-                || f.content != Content::VideoAudio
+            // Live capture may finish before yt-dlp remuxes, or come directly from Twitch as MKV.
+            if f.needs_stream_processing()
+                || (f.container != VideoContainer::Auto && (direct_file.is_some() || stopped))
             {
                 let sources = job.snapshot().files;
                 for source in sources {
@@ -861,7 +904,7 @@ fn run_job(job: &Arc<Job>, tools: &Tools) {
                             AudioCodec::Auto => "mka",
                         }
                     } else {
-                        "mkv"
+                        f.container.extension().unwrap_or("mkv")
                     };
                     let target = source.with_file_name(format!(
                         "{}.encoded.{extension}",
@@ -940,6 +983,9 @@ fn run_job(job: &Arc<Job>, tools: &Tools) {
                                 audio_encoder
                             },
                         ]);
+                        if f.audio_codec == AudioCodec::Opus && !same_codec("audio", "opus") {
+                            cmd.args(["-af", OPUS_CHANNEL_FILTER]);
+                        }
                     }
                     cmd.arg(&target);
                     {

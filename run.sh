@@ -21,7 +21,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
   cp assets/macos/Info.plist "$flowmoor_bundle/Contents/Info.plist"
   cp assets/macos/launch "$flowmoor_bundle/Contents/MacOS/launch"
   cp "target/$flowmoor_profile/flowmoor-rust" "$flowmoor_bundle/Contents/MacOS/flowmoor-rust"
-  cp third-party/THIRD_PARTY_NOTICES.html "$flowmoor_bundle/Contents/Resources/THIRD_PARTY_NOTICES.html"
+  cp assets/macos/Flowmoor.icns third-party/THIRD_PARTY_NOTICES.html "$flowmoor_bundle/Contents/Resources/"
   chmod +x "$flowmoor_bundle/Contents/MacOS/launch"
   exec "$flowmoor_bundle/Contents/MacOS/launch"
 fi

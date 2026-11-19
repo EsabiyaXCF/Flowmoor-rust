@@ -1,10 +1,16 @@
 use super::*;
 use crate::menu_view::{FlowmoorMenu, MenuEvent, MenuItem, MenuKind};
+const VIDEO_CONTAINERS: [VideoContainer; 3] = [
+    VideoContainer::Auto,
+    VideoContainer::Mp4,
+    VideoContainer::Mkv,
+];
 impl DownloadApp {
     pub(super) fn dropdown_control(
         &self,
         kind: MenuKind,
         label: impl Into<SharedString>,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
         let label = label.into();
@@ -21,6 +27,7 @@ impl DownloadApp {
             MenuKind::Presets => "下載預設",
             MenuKind::VideoCodec => "視訊編碼",
             MenuKind::AudioCodec => "音訊編碼",
+            MenuKind::Container => "輸出格式",
             MenuKind::Content => "內容類型",
             MenuKind::Output => {
                 if self.page == Page::Settings {
@@ -38,7 +45,7 @@ impl DownloadApp {
             .track_focus(&focus)
             .tab_index(0)
             .tab_stop(!disabled)
-            .rounded(px(12.))
+            .rounded(px(10.))
             .focus_visible(|s| {
                 s.shadow(vec![BoxShadow {
                     color: cx.theme().ring,
@@ -69,17 +76,18 @@ impl DownloadApp {
             )
             .child(
                 Button::new(name)
-                    .outline()
+                    .border_0()
+                    .bg(cx.theme().button)
                     .disabled(disabled)
                     .w_full()
                     .min_w_0()
-                    .h(px(if kind == MenuKind::LibrarySort {
-                        48.
+                    .h(if kind == MenuKind::LibrarySort {
+                        px(48.)
                     } else {
-                        44.
-                    }))
+                        self.form_control_height(window)
+                    })
                     .px(px(12.))
-                    .py(px(8.))
+                    .py(px(if self.page == Page::Download { 4. } else { 8. }))
                     .dropdown_caret(true)
                     .accessibility_label(tr(name))
                     .label(tr(label.as_ref()))
@@ -90,7 +98,7 @@ impl DownloadApp {
     }
     fn dropdown_disabled(&self, kind: MenuKind) -> bool {
         match kind {
-            MenuKind::Quality | MenuKind::VideoCodec => {
+            MenuKind::Quality | MenuKind::VideoCodec | MenuKind::Container => {
                 !self.contents.iter().any(|c| *c != Content::Audio)
             }
             MenuKind::AudioCodec => !self.contents.iter().any(|c| *c != Content::Video),
@@ -183,6 +191,7 @@ impl DownloadApp {
                 .into_iter()
                 .map(Into::into)
                 .collect(),
+            MenuKind::Container => VIDEO_CONTAINERS.iter().map(|c| c.label().into()).collect(),
             MenuKind::Content => ["影片＋音訊", "僅影片", "僅音訊"]
                 .into_iter()
                 .map(Into::into)
@@ -231,6 +240,7 @@ impl DownloadApp {
                     _ => IconName::Clipboard,
                 }),
                 checked: match kind {
+                    MenuKind::Container => this.container == VIDEO_CONTAINERS[index],
                     MenuKind::Content => this
                         .contents
                         .contains(&[Content::VideoAudio, Content::Video, Content::Audio][index]),
@@ -272,6 +282,11 @@ impl DownloadApp {
                     let value = menu.read(cx).items[index].label.clone();
                     match event {
                         MenuEvent::Choose(_) => match kind {
+                            MenuKind::Container => {
+                                this.container = VIDEO_CONTAINERS[index];
+                                this.presets
+                                    .update(cx, |s, cx| s.set_selected_index(None, window, cx));
+                            }
                             MenuKind::Content => {
                                 let value =
                                     [Content::VideoAudio, Content::Video, Content::Audio][index];

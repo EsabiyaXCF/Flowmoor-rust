@@ -103,12 +103,6 @@ impl DownloadApp {
             .h(px(40.))
             .px(px(9.))
             .py_0()
-            .border_1()
-            .border_color(if self.page == page {
-                cx.theme().primary.opacity(0.45)
-            } else {
-                transparent_black()
-            })
             .bg(if self.page == page {
                 cx.theme().accent
             } else {
@@ -325,8 +319,6 @@ impl DownloadApp {
             .flex_col()
             .overflow_hidden()
             .bg(cx.theme().sidebar)
-            .border_r_1()
-            .border_color(cx.theme().border)
             .child(header)
             .child(nav)
             .child(div().px(px(6.)).pb_3().child(self.nav_button(

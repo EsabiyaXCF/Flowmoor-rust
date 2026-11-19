@@ -586,6 +586,9 @@ impl LiveStream {
                 "-c:a",
                 if bounded { codec.ffmpeg().1 } else { "copy" },
             ]);
+            if bounded && codec == AudioCodec::Opus {
+                cmd.args(["-af", crate::download::OPUS_CHANNEL_FILTER]);
+            }
         }
         cmd.arg(path);
         Ok(cmd)

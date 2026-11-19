@@ -44,7 +44,8 @@ Windows 已驗證原生編譯、真實下載、程序停止及自動原生播放
 ## 下載與媒體庫
 
 - 影片、VOD、目前直播及來源提供的 DVR；最多三個工作並行。
-- 影音／影片／音訊輸出、H.264／VP9／AV1、MP3／AAC／Opus、畫質上限與下載預設。
+- 影音與純影片可在「輸出格式」選擇自動、MP4 或 MKV；純音訊依音訊編碼輸出。
+- 支援 H.264／VP9／AV1、MP3／AAC／Opus、畫質上限與下載預設。
 - 時間範圍、下載進度、取消、VOD 暫停／續傳、直播停止與失敗重試。
 - 媒體庫搜尋與排序、本機影音預覽、重跑下載及參數編輯／複製貼回。
 - 基本下載設定、Cookie 檔、繁中／英文與深淺色。
@@ -59,7 +60,7 @@ Windows 已驗證原生編譯、真實下載、程序停止及自動原生播放
 
 ```sh
 cargo build --locked --no-default-features --bin flowmoor-download
-./target/debug/flowmoor-download 'https://www.youtube.com/watch?v=jNQXAC9IVRw' ./downloads --start 0 --end 3 --height 144 --video-codec h264 --audio-codec aac
+./target/debug/flowmoor-download 'https://www.youtube.com/watch?v=jNQXAC9IVRw' ./downloads --start 0 --end 3 --height 144 --video-codec h264 --audio-codec aac --container mp4
 ```
 
 程式逐行輸出 JSON 進度；Ctrl+C 取消工作。自動化腳本可加 `--cancel-on-stdin`，寫入任一位元組或關閉 stdin 即要求取消並回收下載程序。直播的停止並保存操作可使用桌面介面。Cookie 檔須為 Netscape 格式，不會自動讀取瀏覽器憑證。

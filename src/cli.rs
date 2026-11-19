@@ -1,5 +1,5 @@
 use flowmoor_rust::download::{
-    AudioCodec, Content, Manager, Request, Tools, VideoCodec, parse_time,
+    AudioCodec, Content, Manager, Request, Tools, VideoCodec, VideoContainer, parse_time,
 };
 use std::{path::PathBuf, time::Duration};
 fn main() {
@@ -12,7 +12,7 @@ fn main() {
 fn run() -> Result<(), String> {
     let mut args = std::env::args().skip(1);
     let Some(url) = args.next() else {
-        return Err("用法：flowmoor-download URL OUTPUT [--start HH:MM:SS --end HH:MM:SS] [--live-from-start] [--retries 3] [--cookies FILE] [--content video+audio|video-only|audio-only] [--height 720] [--video-codec auto|h264|vp9|av1] [--audio-codec auto|mp3|aac|opus] [--filename NAME]".into());
+        return Err("用法：flowmoor-download URL OUTPUT [--start HH:MM:SS --end HH:MM:SS] [--live-from-start] [--retries 3] [--cookies FILE] [--content video+audio|video-only|audio-only] [--height 720] [--video-codec auto|h264|vp9|av1] [--audio-codec auto|mp3|aac|opus] [--container auto|mp4|mkv] [--filename NAME]".into());
     };
     let output = PathBuf::from(args.next().ok_or("缺少輸出資料夾")?);
     let mut r = Request {
@@ -64,6 +64,14 @@ fn run() -> Result<(), String> {
                     "aac" => AudioCodec::Aac,
                     "opus" => AudioCodec::Opus,
                     _ => return Err("無效音訊編碼".into()),
+                }
+            }
+            "--container" => {
+                r.format.container = match args.next().ok_or("缺少輸出格式")?.as_str() {
+                    "auto" => VideoContainer::Auto,
+                    "mp4" => VideoContainer::Mp4,
+                    "mkv" => VideoContainer::Mkv,
+                    _ => return Err("輸出格式必須是 auto、mp4 或 mkv".into()),
                 }
             }
             "--height" => {

@@ -6,6 +6,7 @@ pub(super) enum MenuKind {
     Presets,
     VideoCodec,
     AudioCodec,
+    Container,
     Content,
     Output,
     Language,
@@ -104,7 +105,7 @@ impl FlowmoorMenu {
     }
 }
 impl Render for FlowmoorMenu {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let is_dropdown = matches!(self.kind, MenuKind::Content | MenuKind::Output);
         let closing = self.closing;
         let above = self.above;
@@ -251,7 +252,12 @@ impl Render for FlowmoorMenu {
                     .child(tr("沒有可用項目")),
             );
         }
-        let width = self.anchor.size.width;
+        let width = if self.kind == MenuKind::LibraryActions {
+            px(240.)
+        } else {
+            self.anchor.size.width
+        }
+        .min(window.viewport_size().width - px(32.));
         let surface = div()
             .id("flowmoor-menu")
             .role(Role::Menu)
@@ -295,17 +301,18 @@ impl Render for FlowmoorMenu {
                 }
                 cx.stop_propagation();
             }))
-            .on_mouse_down_out(cx.listener(|this, _, _, cx| {
-                this.restore_focus = false;
-                this.close(cx);
+            .on_mouse_down_out(cx.listener(|this, event: &MouseDownEvent, _, cx| {
+                // Let the trigger's click toggle the menu after the button is released.
+                if event.button != MouseButton::Left || !this.anchor.contains(&event.position) {
+                    this.restore_focus = false;
+                    this.close(cx);
+                }
             }))
             .w(width)
             .min_w_0()
             .p(px(6.))
             .rounded(px(18.))
-            .border_1()
-            .border_color(cx.theme().border)
-            .bg(cx.theme().background)
+            .bg(cx.theme().popover)
             .text_color(cx.theme().foreground)
             .child(list)
             .when(self.items.len() > 6, |d| {
@@ -373,7 +380,11 @@ impl Render for FlowmoorMenu {
             } else {
                 gpui_kit::base::Placement::Bottom
             })
-            .align(gpui_kit::base::Align::Start)
+            .align(if self.kind == MenuKind::LibraryActions {
+                gpui_kit::base::Align::End
+            } else {
+                gpui_kit::base::Align::Start
+            })
             .offset(px(if self.kind == MenuKind::Output {
                 8.
             } else {

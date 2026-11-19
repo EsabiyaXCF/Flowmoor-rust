@@ -31,15 +31,16 @@ pub fn apply(dark: bool, cx: &mut App) {
             )
         } else {
             (
-                0xf9fbff, 0xffffff, 0x101a2b, 0x334560, 0xdae4f2, 0x306be0, 0xebf4ff,
+                0xf9fbff, 0xfdfeff, 0x101a2b, 0x334560, 0xdae4f2, 0x306be0, 0xebf4ff,
             )
         };
         let c = &mut t.colors;
         c.background = rgb(background).into();
         c.foreground = rgb(foreground).into();
         c.sidebar = rgb(surface).into();
+        c.popover = rgb(if dark { 0x0d131e } else { 0xfdfeff }).into();
         c.border = rgb(line).into();
-        c.input = rgb(line).into();
+        c.input = transparent_black();
         c.muted = rgb(selected).into();
         c.muted_foreground = rgb(muted).into();
         c.accent = rgb(selected).into();
@@ -47,11 +48,15 @@ pub fn apply(dark: bool, cx: &mut App) {
         c.primary = rgb(accent).into();
         c.primary_foreground = rgb(background).into();
         c.ring = rgb(accent).into();
-        c.button = rgb(surface).into();
+        c.button = rgb(foreground)
+            .opacity(if dark { 0.075 } else { 0.045 })
+            .into();
         c.button_foreground = rgb(foreground).into();
-        c.button_hover = rgb(selected).into();
-        c.button_primary = rgb(selected).into();
+        c.button_hover = rgb(foreground)
+            .opacity(if dark { 0.12 } else { 0.09 })
+            .into();
+        c.button_primary = rgb(accent).opacity(0.14).into();
         c.button_primary_foreground = rgb(foreground).into();
-        c.button_primary_hover = rgb(line).into();
+        c.button_primary_hover = rgb(accent).opacity(0.24).into();
     });
 }

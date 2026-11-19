@@ -52,7 +52,7 @@ impl DownloadApp {
                     .rounded(px(14.))
                     .border_1()
                     .border_color(danger.opacity(0.3))
-                    .bg(danger.opacity(0.04))
+                    .bg(danger.opacity(0.12))
                     .px_5()
                     .py_4()
                     .focus_visible(|s| s.border_color(danger))
@@ -365,6 +365,7 @@ impl DownloadApp {
                                             .text_size(px(13.))
                                             .font_weight(FontWeight::MEDIUM)
                                             .line_height(px(18.))
+                                            .line_clamp(2)
                                             .child(entry.title.clone()),
                                     )
                                     .child(meta),
@@ -383,43 +384,7 @@ impl DownloadApp {
             }
             view = view.child(list);
             if page.is_some_and(|p| p.has_more) {
-                let owner = cx.entity().downgrade();
-                let enabled = !loading && !self.channel_load_failed;
-                view = view.child(
-                    div().h_11().w_full().child(
-                        canvas(
-                            move |bounds, w, _| {
-                                if enabled && bounds.top() < w.viewport_size().height + px(120.) {
-                                    let owner = owner.clone();
-                                    w.on_next_frame(move |_, cx| {
-                                        let _ = owner.update(cx, |this, cx| {
-                                            if this.showing_channel
-                                                && this.pending_channel.is_none()
-                                                && !this.channel_load_failed
-                                                && this
-                                                    .channel_page
-                                                    .as_ref()
-                                                    .is_some_and(|p| p.has_more)
-                                            {
-                                                this.load_channel(true, cx);
-                                            }
-                                        });
-                                    });
-                                }
-                            },
-                            |_, _, _, _| {},
-                        )
-                        .size_full(),
-                    ),
-                );
-                if self.channel_load_failed {
-                    view = view.child(
-                        Button::new("retry-vods")
-                            .ghost()
-                            .label(tr("重試"))
-                            .on_click(cx.listener(|this, _, _, cx| this.load_channel(true, cx))),
-                    );
-                }
+                view = view.child(self.channel_more(loading, cx));
             }
         }
         if loading {

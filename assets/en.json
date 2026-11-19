@@ -1,4 +1,8 @@
 {
+  "影片總長度": "Duration",
+  "拖曳調整順序": "Drag to reorder",
+  "展開詳情": "Show details",
+  "收合詳情": "Hide details",
   "檔案名稱不可使用 Windows 保留的裝置名稱": "The filename cannot use a reserved Windows device name",
   "影片": "Videos",
   "直播中": "Live",
@@ -62,6 +66,7 @@
   "儲存為預設": "Save as preset",
   "影片編解碼器": "Video codec",
   "音訊編解碼器": "Audio codec",
+  "輸出格式": "Output format",
   "時間範圍": "Time range",
   "重置": "Reset",
   "開始下載": "Start Download",

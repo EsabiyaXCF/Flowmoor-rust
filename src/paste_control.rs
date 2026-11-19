@@ -5,7 +5,7 @@ impl DownloadApp {
         let busy = self.pending.is_some() || self.pending_channel.is_some();
         let mut button = Button::new("inspect")
             .primary()
-            .h(px(44.))
+            .h_10()
             .min_w(px(130.))
             .px(px(20.))
             .py_0()

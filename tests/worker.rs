@@ -349,7 +349,7 @@ sleep 60"#,
 
 #[test]
 fn stopped_live_capture_still_finishes_requested_encoding() {
-    use flowmoor_rust::download::AudioCodec;
+    use flowmoor_rust::download::{AudioCodec, VideoContainer};
     let f = Fixture::new(
         r#"while [ "$1" != "--paths" ]; do shift; done
 shift
@@ -374,6 +374,7 @@ while :; do sleep 1; done"#,
     let mut r = f.request();
     r.is_live = true;
     r.format.audio_codec = AudioCodec::Mp3;
+    r.format.container = VideoContainer::Mp4;
     let job = manager.enqueue(r).unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     while !job.snapshot().directory.join("started").exists() {
@@ -386,7 +387,7 @@ while :; do sleep 1; done"#,
     let s = wait(&job);
     assert_eq!(s.phase, Phase::Stopped);
     assert_eq!(s.files.len(), 1);
-    assert!(s.files[0].to_string_lossy().ends_with(".encoded.mkv"));
+    assert!(s.files[0].to_string_lossy().ends_with(".encoded.mp4"));
     assert_eq!(fs::read_to_string(&s.files[0]).unwrap(), "encoded\n");
 }
 

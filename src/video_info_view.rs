@@ -61,7 +61,9 @@ impl DownloadApp {
     ) -> Stateful<Div> {
         let content_width =
             f32::from(window.viewport_size().width) - self.sidebar_width(window) - 66.;
-        let hero_height = (content_width * 0.16).clamp(120., 172.);
+        let hero_height = (content_width * 0.16)
+            .min(f32::from(window.viewport_size().height) * 0.15)
+            .clamp(96., 144.);
         let title_size = (13.44 + content_width * 0.0082).clamp(17.92, 25.92);
         let surface = cx.theme().sidebar;
         let muted = cx.theme().muted_foreground;
@@ -144,11 +146,12 @@ impl DownloadApp {
             .relative()
             .w(relative(0.72))
             .min_h(px(hero_height))
-            .p(px(14.))
+            .px(px(14.))
+            .py_2()
             .flex()
             .flex_col()
             .justify_between()
-            .gap_2()
+            .gap_1()
             .child(
                 div()
                     .text_size(px(title_size))

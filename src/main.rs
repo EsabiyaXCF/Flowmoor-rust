@@ -28,7 +28,8 @@ mod video_info_view;
 use flowmoor_rust::preferences::{Preferences, Preset};
 use flowmoor_rust::{
     download::{
-        AudioCodec, Content, FormatOptions, Manager, Phase, Request, Tools, VideoCodec, parse_time,
+        AudioCodec, Content, FormatOptions, Manager, Phase, Request, Tools, VideoCodec,
+        VideoContainer, parse_time,
     },
     metadata::{self, MediaInfo},
 };
@@ -53,6 +54,12 @@ enum Page {
     Settings,
     Library,
 }
+#[derive(Clone, Default)]
+struct DownloadMetadata {
+    thumbnail: Option<PathBuf>,
+    uploader: Option<String>,
+    avatar: Option<PathBuf>,
+}
 struct DownloadApp {
     manager: Manager,
     url: Entity<InputState>,
@@ -68,6 +75,7 @@ struct DownloadApp {
     retries: Entity<InputState>,
     cookies: Entity<InputState>,
     contents: Vec<Content>,
+    container: VideoContainer,
     video_codec: Entity<SelectState<Vec<SharedString>>>,
     audio_codec: Entity<SelectState<Vec<SharedString>>>,
     presets: Entity<SelectState<Vec<SharedString>>>,
@@ -80,6 +88,7 @@ struct DownloadApp {
     filename: Entity<InputState>,
     live_from_start: bool,
     time_drag: Option<TimeDrag>,
+    time_hover: Option<bool>,
     edit_time: Option<bool>,
     edit_original: [String; 2],
     time_focus: [FocusHandle; 2],
@@ -116,7 +125,7 @@ struct DownloadApp {
     library_preparing: Option<mpsc::Receiver<Result<(PathBuf, f64), String>>>,
     library_preview: Option<Entity<Preview>>,
     library_subscription: Option<Subscription>,
-    job_metadata: std::collections::HashMap<u128, (Option<PathBuf>, Option<String>)>,
+    job_metadata: std::collections::HashMap<u128, DownloadMetadata>,
     settings_tab: usize,
     settings_original: Option<(Preferences, Vec<String>)>,
     pending_avatar: Option<mpsc::Receiver<Result<PathBuf, String>>>,
@@ -128,22 +137,43 @@ struct DownloadApp {
     channel_append: bool,
     showing_channel: bool,
     twitch_vods_open: bool,
+    queue_collapsed: [bool; 2],
+    queue_expanded: std::collections::HashSet<u128>,
     channel_glow: hover_glow::HoverGlow,
     channel_hovered: Option<usize>,
     channel_images: Option<mpsc::Receiver<(Option<String>, PathBuf)>>,
     _subscriptions: Vec<Subscription>,
 }
-fn field(label: &'static str, input: &Entity<InputState>) -> Div {
-    div()
-        .flex_1()
-        .min_w_0()
-        .flex()
-        .flex_col()
-        .gap_2()
-        .child(tr(label))
-        .child(Input::new(input).aria_label(tr(label)).h_11())
-}
 impl DownloadApp {
+    fn form_control_height(&self, window: &Window) -> Pixels {
+        if self.page != Page::Download {
+            return px(44.);
+        }
+        px((f32::from(window.viewport_size().height) / 20.)
+            .round()
+            .clamp(36., 44.))
+    }
+    fn field(
+        &self,
+        label: &'static str,
+        input: &Entity<InputState>,
+        window: &Window,
+        cx: &App,
+    ) -> Div {
+        div()
+            .flex_1()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap(px(if self.page == Page::Download { 4. } else { 8. }))
+            .child(tr(label))
+            .child(
+                Input::new(input)
+                    .bg(cx.theme().button)
+                    .aria_label(tr(label))
+                    .h(self.form_control_height(window)),
+            )
+    }
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let settings = Preferences::load(&Preferences::path());
         let mut load_error = settings.as_ref().err().cloned();
@@ -520,8 +550,8 @@ impl DownloadApp {
                                                 as u128,
                                         ),
                                         result,
-                                        thumbnail: metadata.0,
-                                        uploader: metadata.1,
+                                        thumbnail: metadata.thumbnail,
+                                        uploader: metadata.uploader,
                                     });
                                     changed = true;
                                 }
@@ -558,6 +588,7 @@ impl DownloadApp {
         });
         Self {
             contents: vec![Content::VideoAudio],
+            container: VideoContainer::Auto,
             video_codec,
             audio_codec,
             presets,
@@ -588,6 +619,7 @@ impl DownloadApp {
             cookies,
             live_from_start: false,
             time_drag: None,
+            time_hover: None,
             edit_time: None,
             edit_original: [String::new(), String::new()],
             time_focus: [cx.focus_handle(), cx.focus_handle()],
@@ -636,6 +668,8 @@ impl DownloadApp {
             channel_append: false,
             showing_channel: false,
             twitch_vods_open: true,
+            queue_collapsed: [false; 2],
+            queue_expanded: Default::default(),
             channel_glow: Default::default(),
             channel_hovered: None,
             channel_images: None,
@@ -677,6 +711,7 @@ impl DownloadApp {
         Ok(Request {
             format: FormatOptions {
                 content,
+                container: self.container,
                 max_height,
                 filename: self.filename.read(cx).value().to_string(),
                 video_codec: match self
@@ -823,7 +858,11 @@ impl DownloadApp {
                     if let Some(info) = &self.info {
                         self.job_metadata.insert(
                             job.snapshot().id,
-                            (info.thumbnail.clone(), info.uploader.clone()),
+                            DownloadMetadata {
+                                thumbnail: info.thumbnail.clone(),
+                                uploader: info.uploader.clone(),
+                                avatar: info.avatar.clone(),
+                            },
                         );
                         job.set_title(info.title.clone());
                     }
@@ -875,7 +914,12 @@ impl DownloadApp {
             input.read(cx).focus_handle(cx).focus(window, cx);
             dialog
                 .title("儲存下載預設")
-                .child(Input::new(&input).aria_label(tr("預設名稱")).h_11())
+                .child(
+                    Input::new(&input)
+                        .bg(cx.theme().button)
+                        .aria_label(tr("預設名稱"))
+                        .h_11(),
+                )
                 .when_some(validation, |d, e| {
                     d.child(div().text_sm().text_color(cx.theme().danger).child(e))
                 })
@@ -1034,6 +1078,7 @@ impl DownloadApp {
             return;
         };
         self.contents = p.contents;
+        self.container = p.format.container;
         self.video_codec.update(cx, |s, cx| {
             s.set_selected_index(
                 Some(IndexPath::new(match p.format.video_codec {
@@ -1129,24 +1174,80 @@ impl Render for DownloadApp {
         let muted = t.muted_foreground;
         let line = t.border;
         let danger = t.danger;
+        let stack_preset =
+            f32::from(window.viewport_size().width) - self.sidebar_width(window) < 512.;
+        let short_form = window.viewport_size().height < px(720.);
         let sidebar = self.sidebar_view(window, cx);
-        let mut body = div()
-            .w_full()
-            .flex_shrink_0()
-            .flex()
-            .flex_col()
-            .gap(px(12.));
+        let download_actions = self
+            .info
+            .as_ref()
+            .filter(|_| self.page == Page::Download && !self.showing_channel)
+            .map(|info| {
+                div()
+                    .id("download-actions")
+                    .flex_shrink_0()
+                    .mx_4()
+                    .py_2()
+                    .border_t_1()
+                    .border_color(line)
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .bg(bg)
+                    .child(
+                        Button::new("download")
+                            .primary()
+                            .border_0()
+                            .min_w_0()
+                            .flex_1()
+                            .h_11()
+                            .icon(IconName::ArrowDown)
+                            .label(tr("開始下載"))
+                            .disabled(self.contents.is_empty())
+                            .on_click(cx.listener(|this, _, w, cx| {
+                                this.add(true, cx);
+                                if this.error.is_none() {
+                                    this.error = this.save_preferences(w, cx).err();
+                                }
+                            })),
+                    )
+                    .when(!info.is_live, |d| {
+                        d.child(
+                            Button::new("enqueue")
+                                .ghost()
+                                .w(relative(0.24))
+                                .min_w(px(96.))
+                                .h_11()
+                                .icon(IconName::Plus)
+                                .label(tr("佇列"))
+                                .tooltip(tr("加入佇列"))
+                                .disabled(self.contents.is_empty())
+                                .on_click(cx.listener(|this, _, w, cx| {
+                                    this.add(false, cx);
+                                    if this.error.is_none() {
+                                        this.error = this.save_preferences(w, cx).err();
+                                    }
+                                })),
+                        )
+                    })
+            });
+        let mut body = div().w_full().flex_shrink_0().flex().flex_col().gap_3();
         if self.page == Page::Download {
-            body = body.child(
+            if self.info.is_some() && !self.showing_channel {
+                body = body.min_h_full().justify_between();
+            }
+            body = body.gap(px(if short_form { 6. } else { 8. })).child(
                 div()
                     .flex()
                     .gap_3()
                     .items_center()
                     .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(Input::new(&self.url).aria_label(tr("影片連結")).h_11()),
+                        div().flex_1().min_w_0().child(
+                            Input::new(&self.url)
+                                .bg(cx.theme().button)
+                                .aria_label(tr("影片連結"))
+                                .h_10(),
+                        ),
                     )
                     .child(self.paste_control(cx)),
             );
@@ -1166,7 +1267,7 @@ impl Render for DownloadApp {
                                     .min_w_0()
                                     .flex()
                                     .flex_col()
-                                    .gap_2()
+                                    .gap_1()
                                     .child(tr("內容類型"))
                                     .child(self.dropdown_control(
                                         menu_view::MenuKind::Content,
@@ -1183,6 +1284,7 @@ impl Render for DownloadApp {
                                                 .collect::<Vec<_>>()
                                                 .join("、")
                                         },
+                                        window,
                                         cx,
                                     )),
                             )
@@ -1192,7 +1294,7 @@ impl Render for DownloadApp {
                                     .min_w_0()
                                     .flex()
                                     .flex_col()
-                                    .gap_2()
+                                    .gap_1()
                                     .child(tr("影片品質"))
                                     .child(
                                         self.dropdown_control(
@@ -1202,25 +1304,25 @@ impl Render for DownloadApp {
                                                 .selected_value()
                                                 .cloned()
                                                 .unwrap_or_else(|| "最佳可用畫質".into()),
+                                            window,
                                             cx,
-                                        )
-                                        .h_11()
-                                        .w_full(),
+                                        ),
                                     ),
                             ),
                     )
                     .child(
                         div()
                             .flex()
+                            .when(stack_preset, |d| d.flex_col())
                             .gap(px(8.))
-                            .child(field("檔案名稱", &self.filename))
+                            .child(self.field("檔案名稱", &self.filename, window, cx))
                             .child(
                                 div()
                                     .flex_1()
                                     .min_w_0()
                                     .flex()
                                     .flex_col()
-                                    .gap_2()
+                                    .gap_1()
                                     .child(tr("下載預設"))
                                     .child(
                                         div()
@@ -1238,6 +1340,7 @@ impl Render for DownloadApp {
                                                             .unwrap_or_else(|| {
                                                                 "選擇已儲存預設".into()
                                                             }),
+                                                        window,
                                                         cx,
                                                     ),
                                                 ),
@@ -1245,7 +1348,7 @@ impl Render for DownloadApp {
                                             .child(
                                                 Button::new("save-preset")
                                                     .ghost()
-                                                    .h_11()
+                                                    .h(self.form_control_height(window))
                                                     .icon(IconName::Plus)
                                                     .tooltip(tr("儲存為預設"))
                                                     .on_click(cx.listener(|this, _, w, cx| {
@@ -1255,7 +1358,7 @@ impl Render for DownloadApp {
                                             .child(
                                                 Button::new("delete-preset")
                                                     .ghost()
-                                                    .h_11()
+                                                    .h(self.form_control_height(window))
                                                     .icon(IconName::Trash)
                                                     .tooltip(tr("刪除選取的預設"))
                                                     .disabled(
@@ -1284,88 +1387,114 @@ impl Render for DownloadApp {
                             ),
                     )
                     .child(
-                        div()
-                            .flex()
-                            .gap(px(8.))
-                            .child(
+                        div().flex().gap(px(8.)).children(
+                            [
+                                (
+                                    "影片編解碼器",
+                                    menu_view::MenuKind::VideoCodec,
+                                    self.video_codec.read(cx).selected_value().cloned(),
+                                ),
+                                (
+                                    "音訊編解碼器",
+                                    menu_view::MenuKind::AudioCodec,
+                                    self.audio_codec.read(cx).selected_value().cloned(),
+                                ),
+                                (
+                                    "輸出格式",
+                                    menu_view::MenuKind::Container,
+                                    Some(self.container.label().into()),
+                                ),
+                            ]
+                            .map(|(label, kind, selected)| {
                                 div()
                                     .flex_1()
                                     .min_w_0()
                                     .flex()
                                     .flex_col()
-                                    .gap_2()
-                                    .child(tr("影片編解碼器"))
-                                    .child(
-                                        self.dropdown_control(
-                                            menu_view::MenuKind::VideoCodec,
-                                            self.video_codec
-                                                .read(cx)
-                                                .selected_value()
-                                                .cloned()
-                                                .unwrap_or_else(|| "自動".into()),
-                                            cx,
-                                        )
-                                        .h_11()
-                                        .w_full(),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_2()
-                                    .child(tr("音訊編解碼器"))
-                                    .child(
-                                        self.dropdown_control(
-                                            menu_view::MenuKind::AudioCodec,
-                                            self.audio_codec
-                                                .read(cx)
-                                                .selected_value()
-                                                .cloned()
-                                                .unwrap_or_else(|| "自動".into()),
-                                            cx,
-                                        )
-                                        .h_11()
-                                        .w_full(),
-                                    ),
-                            ),
+                                    .gap_1()
+                                    .child(tr(label))
+                                    .child(self.dropdown_control(
+                                        kind,
+                                        selected.unwrap_or_else(|| "自動".into()),
+                                        window,
+                                        cx,
+                                    ))
+                            }),
+                        ),
                     )
                     .child(
                         div()
                             .flex()
-                            .items_center()
-                            .justify_between()
-                            .pt_2()
+                            .flex_col()
+                            .gap_1()
+                            .px_3()
+                            .py_2()
+                            .rounded(px(18.))
+                            .bg(surface)
                             .child(
                                 div()
                                     .flex()
-                                    .gap_2()
                                     .items_center()
-                                    .child(Icon::new(IconName::Clock).size_4())
-                                    .child(tr("時間範圍")),
+                                    .justify_between()
+                                    .gap_3()
+                                    .min_w_0()
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .gap_2()
+                                            .items_center()
+                                            .child(Icon::new(IconName::Clock).size_4())
+                                            .child(tr("時間範圍")),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .text_xs()
+                                            .text_color(muted)
+                                            .truncate()
+                                            .child(info.duration.map_or_else(
+                                                || tr("直播中"),
+                                                |duration| {
+                                                    format!(
+                                                        "{}：{}",
+                                                        tr("影片總長度"),
+                                                        flowmoor_rust::time_controls::clock(
+                                                            duration as u64
+                                                        )
+                                                    )
+                                                },
+                                            )),
+                                    )
+                                    .child(
+                                        Button::new("reset-range")
+                                            .custom(
+                                                ButtonCustomVariant::new(cx)
+                                                    .foreground(danger)
+                                                    .hover(danger.opacity(0.12)),
+                                            )
+                                            .icon(IconName::RotateCcw)
+                                            .label(tr("重置"))
+                                            .on_click(cx.listener(|this, _, window, cx| {
+                                                this.start.update(cx, |s, cx| {
+                                                    s.set_value("", window, cx)
+                                                });
+                                                this.end.update(cx, |s, cx| {
+                                                    s.set_value("", window, cx)
+                                                });
+                                                cx.notify();
+                                            })),
+                                    ),
                             )
                             .child(
-                                Button::new("reset-range")
-                                    .ghost()
-                                    .icon(IconName::RotateCcw)
-                                    .label(tr("重置"))
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.start.update(cx, |s, cx| s.set_value("", window, cx));
-                                        this.end.update(cx, |s, cx| s.set_value("", window, cx));
-                                        cx.notify();
-                                    })),
+                                div()
+                                    .flex()
+                                    .gap_4()
+                                    .child(self.time_field(true, short_form, window, cx))
+                                    .child(self.time_field(false, short_form, window, cx)),
                             ),
                     )
-                    .child(
-                        div()
-                            .flex()
-                            .gap_4()
-                            .child(self.time_field(true, cx))
-                            .child(self.time_field(false, cx)),
-                    )
-                    .child(self.output_control(cx))
+                    .child(self.output_control(short_form, window, cx))
                     .when(info.is_live && self.info_url.contains("youtu"), |d| {
                         d.child(
                             Button::new("live-mode")
@@ -1380,67 +1509,21 @@ impl Render for DownloadApp {
                                     cx.notify();
                                 })),
                         )
-                    })
-                    .child(
-                        div()
-                            .mt_1()
-                            .flex()
-                            .items_center()
-                            .w_full()
-                            .rounded_full()
-                            .overflow_hidden()
-                            .bg(cx.theme().button_primary)
-                            .child(
-                                Button::new("download")
-                                    .ghost()
-                                    .rounded_none()
-                                    .flex_1()
-                                    .h(px(52.))
-                                    .icon(IconName::ArrowDown)
-                                    .label(tr("開始下載"))
-                                    .disabled(self.contents.is_empty())
-                                    .on_click(cx.listener(|this, _, w, cx| {
-                                        this.add(true, cx);
-                                        if this.error.is_none() {
-                                            this.error = this.save_preferences(w, cx).err();
-                                        }
-                                    })),
-                            )
-                            .when(!info.is_live, |d| {
-                                d.child(div().w(px(1.)).h(px(36.)).bg(line)).child(
-                                    Button::new("enqueue")
-                                        .ghost()
-                                        .rounded_none()
-                                        .w(relative(0.24))
-                                        .min_w(px(96.))
-                                        .h(px(52.))
-                                        .icon(IconName::Plus)
-                                        .label(tr("佇列"))
-                                        .tooltip(tr("加入佇列"))
-                                        .disabled(self.contents.is_empty())
-                                        .on_click(cx.listener(|this, _, w, cx| {
-                                            this.add(false, cx);
-                                            if this.error.is_none() {
-                                                this.error = this.save_preferences(w, cx).err();
-                                            }
-                                        })),
-                                )
-                            }),
-                    );
+                    });
             } else {
                 body = body.child(
                     div()
                         .flex_1()
-                        .min_h(px(280.))
+                        .pt_8()
+                        .pb_8()
                         .flex()
                         .flex_col()
                         .items_center()
-                        .justify_center()
-                        .gap_4()
+                        .gap_2()
                         .child(
                             img(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/boat.png"))
-                                .w_48()
-                                .h_32(),
+                                .w_32()
+                                .h_24(),
                         )
                         .child(div().text_color(muted).child(tr(
                             if self.pending.is_some() || self.pending_channel.is_some() {
@@ -1484,34 +1567,34 @@ impl Render for DownloadApp {
                     .child(time_events)
                     .when(self.page != Page::Settings, |d| d.child(sidebar))
                     .child(
-                        div().flex_1().min_w_0().h_full().flex().flex_col().child(
-                            div()
-                                .flex_1()
-                                .min_h_0()
-                                .relative()
-                                .when(self.page == Page::Download, |d| d.m_4())
-                                .child(
-                                    div()
-                                        .id("workspace")
-                                        .track_scroll(&self.workspace_scroll)
-                                        .size_full()
-                                        .overflow_y_scroll()
-                                        .when(self.page == Page::Download, |d| {
-                                            d.p_4()
-                                                .rounded(px(20.))
-                                                .border_1()
-                                                .border_color(line)
-                                                .bg(surface)
-                                        })
-                                        .when(self.page == Page::Library, |d| d.px_4().py_6())
-                                        .child(body),
-                                )
-                                .child(div().absolute().inset_0().child(
-                                    gpui_kit::component::scroll::Scrollbar::vertical(
-                                        &self.workspace_scroll,
-                                    ),
-                                )),
-                        ),
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .h_full()
+                            .flex()
+                            .flex_col()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_h_0()
+                                    .relative()
+                                    .child(
+                                        div()
+                                            .id("workspace")
+                                            .track_scroll(&self.workspace_scroll)
+                                            .size_full()
+                                            .overflow_y_scroll()
+                                            .when(self.page == Page::Download, |d| d.px_4().py_2())
+                                            .when(self.page == Page::Library, |d| d.px_4().py_6())
+                                            .child(body),
+                                    )
+                                    .child(div().absolute().inset_0().child(
+                                        gpui_kit::component::scroll::Scrollbar::vertical(
+                                            &self.workspace_scroll,
+                                        ),
+                                    )),
+                            )
+                            .when_some(download_actions, |d, actions| d.child(actions)),
                     ),
             )
             .when_some(self.open_menu.clone(), |d, menu| {
@@ -1553,7 +1636,7 @@ fn main() {
             gpui_kit::open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::centered(size(px(1100.), px(800.)), cx)),
-                    window_min_size: Some(size(px(760.), px(620.))),
+                    window_min_size: Some(size(px(640.), px(480.))),
                     titlebar: Some(TitlebarOptions {
                         traffic_light_position: Some(point(px(14.), px(16.))),
                         ..gpui_kit::component::TitleBar::title_bar_options()

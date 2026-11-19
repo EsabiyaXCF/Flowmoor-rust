@@ -4,6 +4,9 @@ pub(super) struct FlowmoorAssets;
 impl AssetSource for FlowmoorAssets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
         let data = match path.rsplit('/').next().unwrap_or(path) {
+            "arrow-up.svg" => {
+                Some(include_bytes!("../assets/phosphor/arrow-up.svg") as &'static [u8])
+            }
             "arrow-down.svg" => {
                 Some(include_bytes!("../assets/phosphor/arrow-down.svg") as &'static [u8])
             }

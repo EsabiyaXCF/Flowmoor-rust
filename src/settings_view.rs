@@ -105,20 +105,26 @@ impl DownloadApp {
         let mut content = div().p_6().flex().flex_col().gap_6().min_h(px(420.));
         match self.settings_tab {
             0 => {
-                content = content.child(div().max_w(px(576.)).child(self.output_control(cx)));
+                content = content.child(
+                    div()
+                        .max_w(px(576.))
+                        .child(self.output_control(false, window, cx)),
+                );
             }
             1 => {
                 content = content
-                    .child(
-                        div()
-                            .max_w(px(576.))
-                            .child(field("錯誤重試次數", &self.retries)),
-                    )
-                    .child(
-                        div()
-                            .max_w(px(576.))
-                            .child(field("Cookie 檔案（選填）", &self.cookies)),
-                    );
+                    .child(div().max_w(px(576.)).child(self.field(
+                        "錯誤重試次數",
+                        &self.retries,
+                        window,
+                        cx,
+                    )))
+                    .child(div().max_w(px(576.)).child(self.field(
+                        "Cookie 檔案（選填）",
+                        &self.cookies,
+                        window,
+                        cx,
+                    )));
             }
             3 => {
                 content = content.child(
@@ -168,6 +174,7 @@ impl DownloadApp {
                             } else {
                                 "繁體中文"
                             },
+                            window,
                             cx,
                         )),
                 );
